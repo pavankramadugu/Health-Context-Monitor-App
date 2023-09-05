@@ -13,18 +13,36 @@
         <action
             android:id="@+id/actionSensingFragmentToCameraFragment"
             app:destination="@id/cameraFragment" />
+        <action
+            android:id="@+id/actionSensingFragmentToRespRateFragment"
+            app:destination="@id/respRateFragment" />
     </fragment>
 
     <fragment
         android:id="@+id/navigation_dashboard"
         android:name="com.asu.mc.healthcontextmonitor.ui.symptoms.SymptomsFragment"
         android:label="@string/title_symptoms"
-        tools:layout="@layout/fragment_dashboard" />
+        tools:layout="@layout/fragment_dashboard">
+    </fragment>
 
     <fragment
         android:id="@+id/cameraFragment"
         android:name="com.asu.mc.healthcontextmonitor.ui.sensing.CameraFragment"
         android:label="Heart Rate"
-        tools:layout="@layout/fragment_camera" />
+        tools:layout="@layout/fragment_camera">
+        <action
+            android:id="@+id/actionCameraFragmentToRespFragment"
+            app:destination="@id/respRateFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/respRateFragment"
+        android:name="com.asu.mc.healthcontextmonitor.ui.sensing.RespRateFragment"
+        android:label="Respiratory Rate"
+        tools:layout="@layout/fragment_resp_rate">
+        <action
+            android:id="@+id/actionRespRateFragmentToSymptomsFragment"
+            app:destination="@id/navigation_dashboard" />
+    </fragment>
 
 </navigation>

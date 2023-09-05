@@ -4,26 +4,18 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.media.MediaMetadataRetriever
-import android.net.Uri
 import android.os.AsyncTask
-import android.provider.MediaStore
+import android.util.Log
 
 class HeartRate(private val context: Context) {
 
-    fun convertMediaUriToPath(uri: Uri?): String? {
-        val proj = arrayOf(MediaStore.Images.Media.DATA)
-        uri?.let {
-            val cursor = context.contentResolver.query(it, proj, null, null, null) ?: return null
-            val column_index = cursor.getColumnIndexOrThrow(MediaStore.Images.Media.DATA)
-            cursor.moveToFirst()
-            val path = cursor.getString(column_index)
-            cursor.close()
-            return path
-        }
-        return null
+    interface HeartRateCallback {
+        fun onHeartRateCalculated(heartRate: String?)
+        fun onHeartRateCalculationFailed()
     }
 
-    inner class SlowTask : AsyncTask<String, Void, String?>() {
+    inner class SlowTask(private val callback: HeartRateCallback) :
+        AsyncTask<String, Void, String?>() {
         override fun doInBackground(vararg params: String?): String? {
             val retriever = MediaMetadataRetriever()
             val frameList = ArrayList<Bitmap>()
@@ -73,6 +65,16 @@ class HeartRate(private val context: Context) {
                 }
                 val rate = ((count.toFloat() / 45) * 60).toInt()
                 return (rate / 2).toString()
+            }
+        }
+
+        override fun onPostExecute(result: String?) {
+            super.onPostExecute(result)
+            Log.d("HeartRate", "Calculated heart rate: $result")
+            if (result != null) {
+                callback.onHeartRateCalculated(result)
+            } else {
+                callback.onHeartRateCalculationFailed()
             }
         }
     }

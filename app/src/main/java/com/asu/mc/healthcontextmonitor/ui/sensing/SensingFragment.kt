@@ -26,5 +26,10 @@ class SensingFragment : Fragment() {
             val action = SensingFragmentDirections.actionSensingFragmentToCameraFragment()
             findNavController().navigate(action)
         }
+
+        binding.btnRespRate.setOnClickListener {
+            val action = SensingFragmentDirections.actionSensingFragmentToRespRateFragment()
+            findNavController().navigate(action)
+        }
     }
 }

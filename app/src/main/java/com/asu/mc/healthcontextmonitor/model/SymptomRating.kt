@@ -6,7 +6,8 @@ import androidx.room.PrimaryKey
 
 @Entity(tableName = "symptom_ratings")
 data class SymptomRating(
-    @PrimaryKey @ColumnInfo(name = "symptom") val symptom: String,
-    @ColumnInfo(name = "rating") val rating: Float
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,  // Auto-generated primary key
+    @ColumnInfo(name = "timestamp") val timestamp: Long,  // Timestamp for the group of symptoms
+    @ColumnInfo(name = "symptom") val symptom: String,  // Symptom description
+    @ColumnInfo(name = "rating") var rating: Float  // Symptom rating
 )
-

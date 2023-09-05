@@ -23,6 +23,7 @@ class SymptomsFragment : Fragment() {
     private lateinit var symptomRatingBar: RatingBar
     private lateinit var uploadButton: Button
     private lateinit var uploadProgressBar: ProgressBar
+    private var currentTimestamp: Long? = null
     private val symptomRatings = mutableMapOf<String, Float>()
 
     override fun onCreateView(
@@ -37,8 +38,9 @@ class SymptomsFragment : Fragment() {
         uploadProgressBar = view.findViewById(R.id.upload_progress)
 
         lifecycleScope.launch {
-            loadRatings()
-            setupViews()  // Extracted the rest of your onCreateView logic into a separate function
+            currentTimestamp = database.symptomRatingDao().getLatestTimestamp()
+            loadRatings(currentTimestamp)
+            setupViews()
         }
 
         return view
@@ -79,10 +81,15 @@ class SymptomsFragment : Fragment() {
         }
     }
 
-    private suspend fun loadRatings() {
+    private suspend fun loadRatings(timestamp: Long?) {
         val allSymptoms = resources.getStringArray(R.array.symptoms_array)
         for (symptom in allSymptoms) {
-            val rating = database.symptomRatingDao().getRatingBySymptom(symptom)?.rating ?: 0f
+            val rating = if (timestamp != null) {
+                database.symptomRatingDao()
+                    .getRatingBySymptomAndTimestamp(symptom, timestamp)?.rating ?: 0f
+            } else {
+                0f
+            }
             symptomRatings[symptom] = rating
         }
     }
@@ -97,10 +104,21 @@ class SymptomsFragment : Fragment() {
         val allSymptoms = resources.getStringArray(R.array.symptoms_array)
 
         lifecycleScope.launch {
+            val time = currentTimestamp ?: System.currentTimeMillis()
             for (symptom in allSymptoms) {
                 val symptomRating = symptomRatings.getOrDefault(symptom, 0f)
-                database.symptomRatingDao().insert(SymptomRating(symptom, symptomRating))
+                val existingRecord =
+                    database.symptomRatingDao().getRatingBySymptomAndTimestamp(symptom, time)
+
+                if (existingRecord != null) {
+                    existingRecord.rating = symptomRating
+                    database.symptomRatingDao().update(existingRecord)
+                } else {
+                    database.symptomRatingDao()
+                        .insert(SymptomRating(0, time, symptom, symptomRating))
+                }
             }
+            currentTimestamp = null
             uploadProgressBar.visibility = View.GONE
         }
     }
