@@ -12,10 +12,13 @@ import android.widget.RatingBar
 import android.widget.Spinner
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import androidx.navigation.fragment.navArgs
 import com.asu.mc.healthcontextmonitor.R
-import com.asu.mc.healthcontextmonitor.model.SymptomRating
+import com.asu.mc.healthcontextmonitor.model.HealthContextEntity
 import com.asu.mc.healthcontextmonitor.ui.database.AppDatabase
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class SymptomsFragment : Fragment() {
 
@@ -38,8 +41,7 @@ class SymptomsFragment : Fragment() {
         uploadProgressBar = view.findViewById(R.id.upload_progress)
 
         lifecycleScope.launch {
-            currentTimestamp = database.symptomRatingDao().getLatestTimestamp()
-            loadRatings(currentTimestamp)
+            loadRatings()
             setupViews()
         }
 
@@ -81,45 +83,81 @@ class SymptomsFragment : Fragment() {
         }
     }
 
-    private suspend fun loadRatings(timestamp: Long?) {
-        val allSymptoms = resources.getStringArray(R.array.symptoms_array)
-        for (symptom in allSymptoms) {
-            val rating = if (timestamp != null) {
-                database.symptomRatingDao()
-                    .getRatingBySymptomAndTimestamp(symptom, timestamp)?.rating ?: 0f
-            } else {
-                0f
+    private fun loadRatings() {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val latestRecord = database.healthContextDao().getLatestRecord()
+
+            withContext(Dispatchers.Main) {
+                if (latestRecord != null) {
+                    symptomRatings["Nausea"] = latestRecord.nausea
+                    symptomRatings["Headache"] = latestRecord.headache
+                    symptomRatings["Diarrhea"] = latestRecord.diarrhea
+                    symptomRatings["Soar Throat"] = latestRecord.soarThroat
+                    symptomRatings["Fever"] = latestRecord.fever
+                    symptomRatings["Muscle Ache"] = latestRecord.muscleAche
+                    symptomRatings["Loss of Smell or Taste"] = latestRecord.lossOfSmellOrTaste
+                    symptomRatings["Cough"] = latestRecord.cough
+                    symptomRatings["Shortness of Breath"] = latestRecord.shortnessOfBreath
+                    symptomRatings["Feeling tired"] = latestRecord.feelingTired
+                } else {
+                    val allSymptoms = resources.getStringArray(R.array.symptoms_array)
+                    for (symptom in allSymptoms) {
+                        symptomRatings[symptom] = 0f
+                    }
+                }
             }
-            symptomRatings[symptom] = rating
         }
     }
 
     private val database by lazy { AppDatabase.getInstance(requireContext()) }
 
     private fun uploadRatings() {
-        val selectedSymptom = symptomsSpinner.selectedItem.toString()
-        val rating = symptomRatingBar.rating
-        symptomRatings[selectedSymptom] = rating
+        val args: SymptomsFragmentArgs by navArgs()
+        val heartRate = args.heartRate
+        val respRate = args.respRate
 
-        val allSymptoms = resources.getStringArray(R.array.symptoms_array)
-
-        lifecycleScope.launch {
+        lifecycleScope.launch(Dispatchers.IO) {
             val time = currentTimestamp ?: System.currentTimeMillis()
-            for (symptom in allSymptoms) {
-                val symptomRating = symptomRatings.getOrDefault(symptom, 0f)
-                val existingRecord =
-                    database.symptomRatingDao().getRatingBySymptomAndTimestamp(symptom, time)
+            val existingRecord = database.healthContextDao().getRecordByTimestamp(time)
 
-                if (existingRecord != null) {
-                    existingRecord.rating = symptomRating
-                    database.symptomRatingDao().update(existingRecord)
-                } else {
-                    database.symptomRatingDao()
-                        .insert(SymptomRating(0, time, symptom, symptomRating))
-                }
+            if (existingRecord != null) {
+                existingRecord.heartRate = heartRate
+                existingRecord.respRate = respRate
+                existingRecord.nausea = symptomRatings.getOrDefault("Nausea", 0f)
+                existingRecord.headache = symptomRatings.getOrDefault("Headache", 0f)
+                existingRecord.diarrhea = symptomRatings.getOrDefault("Diarrhea", 0f)
+                existingRecord.soarThroat = symptomRatings.getOrDefault("Soar Throat", 0f)
+                existingRecord.fever = symptomRatings.getOrDefault("Fever", 0f)
+                existingRecord.muscleAche = symptomRatings.getOrDefault("Muscle Ache", 0f)
+                existingRecord.lossOfSmellOrTaste = symptomRatings.getOrDefault("Loss of Smell or Taste", 0f)
+                existingRecord.cough = symptomRatings.getOrDefault("Cough", 0f)
+                existingRecord.shortnessOfBreath = symptomRatings.getOrDefault("Shortness of Breath", 0f)
+                existingRecord.feelingTired = symptomRatings.getOrDefault("Feeling tired", 0f)
+
+                database.healthContextDao().update(existingRecord)
+            } else {
+                val newRecord = HealthContextEntity(
+                    timestamp = time,
+                    heartRate = heartRate,
+                    respRate = respRate,
+                    nausea = symptomRatings.getOrDefault("Nausea", 0f),
+                    headache = symptomRatings.getOrDefault("Headache", 0f),
+                    diarrhea = symptomRatings.getOrDefault("Diarrhea", 0f),
+                    soarThroat = symptomRatings.getOrDefault("Soar Throat", 0f),
+                    fever = symptomRatings.getOrDefault("Fever", 0f),
+                    muscleAche = symptomRatings.getOrDefault("Muscle Ache", 0f),
+                    lossOfSmellOrTaste = symptomRatings.getOrDefault("Loss of Smell or Taste", 0f),
+                    cough = symptomRatings.getOrDefault("Cough", 0f),
+                    shortnessOfBreath = symptomRatings.getOrDefault("Shortness of Breath", 0f),
+                    feelingTired = symptomRatings.getOrDefault("Feeling tired", 0f)
+                )
+                database.healthContextDao().insert(newRecord)
             }
-            currentTimestamp = null
-            uploadProgressBar.visibility = View.GONE
+
+            withContext(Dispatchers.Main) {
+                currentTimestamp = null
+                uploadProgressBar.visibility = View.GONE
+            }
         }
     }
 }

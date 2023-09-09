@@ -16,6 +16,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.core.TorchState
@@ -85,22 +86,40 @@ class CameraFragment : Fragment(), HeartRate.HeartRateCallback {
         return binding.root
     }
 
+    private fun showHeartRateDialog() {
+        AlertDialog.Builder(requireContext())
+            .setTitle("Heart Rate")
+            .setMessage("Please softly press your index finger on the camera lens while covering the flash light.")
+            .setPositiveButton("OK", null)
+            .show()
+    }
+
+    private val requestPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+            if (isGranted) {
+                startCamera()
+            } else {
+                Toast.makeText(requireContext(), "Camera permission denied", Toast.LENGTH_SHORT).show()
+            }
+        }
+
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
+        showHeartRateDialog()
+        requestPermissionLauncher.launch(Manifest.permission.CAMERA)
         progressDialog = ProgressDialog(context).apply {
             setMessage("Calculating heart rate...")
             setCancelable(false)
         }
 
-        if (allPermissionsGranted()) {
-            startCamera()
-        } else {
+        if (!allPermissionsGranted()) {
             ActivityCompat.requestPermissions(
                 requireActivity(),
                 arrayOf(Manifest.permission.CAMERA),
                 REQUEST_CODE_PERMISSIONS
             )
+        } else {
+            startCamera()
         }
 
         binding.videoCaptureButton.setOnClickListener {
@@ -258,7 +277,9 @@ class CameraFragment : Fragment(), HeartRate.HeartRateCallback {
                 .setMessage("Your calculated heart rate is: $heartRate")
                 .setPositiveButton("Close") { dialog, _ ->
                     dialog.dismiss()
-                    findNavController().navigate(R.id.actionCameraFragmentToRespFragment)
+                    val action = CameraFragmentDirections
+                        .actionCameraFragmentToRespFragment(heartRate?.toFloatOrNull() ?: 0.0f)
+                    findNavController().navigate(action)
                 }
                 .show()
         }

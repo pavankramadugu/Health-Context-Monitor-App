@@ -15,6 +15,7 @@ import android.view.ViewGroup
 import android.widget.Button
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.findNavController
+import androidx.navigation.fragment.navArgs
 import com.asu.mc.healthcontextmonitor.R
 import com.asu.mc.healthcontextmonitor.model.RespRateEntity
 import com.asu.mc.healthcontextmonitor.ui.database.AppDatabase
@@ -45,6 +46,9 @@ class RespRateFragment : Fragment(), SensorEventListener {
         val progressDialog = ProgressDialog(context)
         startCaptureButton = view.findViewById(R.id.startCaptureButton)
 
+        val args: RespRateFragmentArgs by navArgs()
+        val heartRate = args.heartRate
+
         startCaptureButton.setOnClickListener {
             it.isEnabled = false
             accelValuesX.clear()
@@ -73,7 +77,12 @@ class RespRateFragment : Fragment(), SensorEventListener {
                             .setTitle("Result")
                             .setMessage("Your Resp Rate is: $rate")
                             .setPositiveButton("OK") { _, _ ->
-                                findNavController().navigate(R.id.actionRespRateFragmentToSymptomsFragment)
+                                val action =
+                                    RespRateFragmentDirections.actionRespRateFragmentToSymptomsFragment(
+                                        heartRate,
+                                        rate
+                                    )
+                                findNavController().navigate(action)
                             }
                             .show()
                         it.isEnabled = true

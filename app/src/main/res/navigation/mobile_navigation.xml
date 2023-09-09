@@ -23,6 +23,14 @@
         android:name="com.asu.mc.healthcontextmonitor.ui.symptoms.SymptomsFragment"
         android:label="@string/title_symptoms"
         tools:layout="@layout/fragment_dashboard">
+        <argument
+            android:name="heartRate"
+            app:argType="float"
+            android:defaultValue="-1.0" />
+        <argument
+            android:name="respRate"
+            app:argType="integer"
+            android:defaultValue="1"/>
     </fragment>
 
     <fragment
@@ -40,6 +48,10 @@
         android:name="com.asu.mc.healthcontextmonitor.ui.sensing.RespRateFragment"
         android:label="Respiratory Rate"
         tools:layout="@layout/fragment_resp_rate">
+        <argument
+            android:name="heartRate"
+            app:argType="float"
+            android:defaultValue="-1.0" />
         <action
             android:id="@+id/actionRespRateFragmentToSymptomsFragment"
             app:destination="@id/navigation_dashboard" />
