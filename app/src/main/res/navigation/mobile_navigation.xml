@@ -57,4 +57,11 @@
             app:destination="@id/navigation_dashboard" />
     </fragment>
 
+    <fragment
+        android:id="@+id/navigation_traffic"
+        android:name="com.asu.mc.healthcontextmonitor.ui.traffic.TrafficFragment"
+        android:label="@string/traffic"
+        tools:layout="@layout/activity_traffic">
+    </fragment>
+
 </navigation>
