@@ -1,7 +1,11 @@
 package com.asu.mc.healthcontextmonitor.ui.traffic
 
 import android.app.AlertDialog
+import android.app.ProgressDialog
 import android.graphics.Color
+import android.icu.text.SimpleDateFormat
+import android.icu.util.Calendar
+import android.icu.util.TimeZone
 import android.os.Bundle
 import android.text.Spannable
 import android.text.SpannableString
@@ -24,11 +28,13 @@ import retrofit2.Callback
 import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.util.Locale
 
 class TrafficFragment : Fragment() {
 
     var startAddress: String? = null
     var endAddress: String? = null
+    private var progressDialog: ProgressDialog? = null
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -45,6 +51,7 @@ class TrafficFragment : Fragment() {
 
         rootView.findViewById<Button>(R.id.btn_analyze_traffic).setOnClickListener {
             if (startAddress != null && endAddress != null) {
+                showProgressDialog()
                 fetchDirections(startAddress!!, endAddress!!)
             }
         }
@@ -84,6 +91,10 @@ class TrafficFragment : Fragment() {
     }
 
     private fun fetchDirections(startAddress: String, endAddress: String) {
+        val times = arrayOf("8:00", "13:00", "17:00", "22:00", "15:00")
+        val results = mutableListOf<String>()
+        val distances = mutableListOf<String>()
+
         val retrofit = Retrofit.Builder()
             .baseUrl("https://maps.googleapis.com/maps/api/")
             .addConverterFactory(GsonConverterFactory.create())
@@ -91,64 +102,128 @@ class TrafficFragment : Fragment() {
 
         val service = retrofit.create(TrafficModels.GoogleMapsApiService::class.java)
 
-        val distanceMatrixCall = service.getDistanceMatrix(
-            startAddress,
-            endAddress,
-            "imperial",
-            "driving",
-            "now",
-            "best_guess",
-            "AIzaSyDhrz7YAoJTMjuF9-YCMZSNXIe5F3d2pNo"
-        )
+        times.forEach { time ->
+            // Convert time to Unix timestamp (departureTime)
+            val departureTime = timeToUnixTimestamp(time)
 
-        distanceMatrixCall.enqueue(object : Callback<TrafficModels.DistanceMatrixResponse> {
-            override fun onResponse(call: Call<TrafficModels.DistanceMatrixResponse>, response: Response<TrafficModels.DistanceMatrixResponse>) {
-                val result = response.body()
-                println(result)
-                result?.rows?.forEach { row ->
-                    row.elements.forEach { element ->
-                        Log.d("DistanceMatrix", "Distance: ${element.distance.text}, Duration: ${element.duration.text}")
+            println(departureTime)
 
-                        val origin = result.origin_addresses[0] // Adjust index based on your needs
-                        val destination = result.destination_addresses[0] // Adjust index based on your needs
+            val distanceMatrixCall = service.getDistanceMatrix(
+                startAddress,
+                endAddress,
+                "imperial",
+                "driving",
+                departureTime,
+                "best_guess",
+                "AIzaSyDhrz7YAoJTMjuF9-YCMZSNXIe5F3d2pNo"
+            )
 
-                        val averageDuration = "${element.duration_in_traffic.text} (${element.duration_in_traffic.value} seconds)"
-                        val duration = "${element.duration.text} (${element.duration.value} seconds)"
-
-                        val category = if (element.duration_in_traffic.value >= element.duration.value) "LCW" else "HCW"
-                        val categoryColor = if (category == "LCW") Color.GREEN else Color.RED
-
-                        val message = """
-                    Origin: $origin
-                    Destination: $destination
-                    Average Duration: $averageDuration
-                    Duration: $duration
-                    Category: $category
-                """.trimIndent()
-
-                        val alertDialog = AlertDialog.Builder(context).apply {
-                            setTitle("Traffic Congestion Analysis")
-                            setMessage(message)
-                            setPositiveButton("OK") { dialog, _ -> dialog.dismiss() }
-                            setCancelable(false)
-                        }.create()
-
-                        alertDialog.show()
-
-                        // Change the color of Category
-                        alertDialog.findViewById<TextView>(android.R.id.message)?.apply {
-                            val spannable = SpannableString(text)
-                            val startIndex = text.indexOf(category)
-                            spannable.setSpan(ForegroundColorSpan(categoryColor), startIndex, startIndex + category.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
-                            text = spannable
+            distanceMatrixCall.enqueue(object : Callback<TrafficModels.DistanceMatrixResponse> {
+                override fun onResponse(
+                    call: Call<TrafficModels.DistanceMatrixResponse>,
+                    response: Response<TrafficModels.DistanceMatrixResponse>
+                ) {
+                    val result = response.body()
+                    result?.rows?.forEach { row ->
+                        row.elements.forEach { element ->
+                            val ratio =
+                                element.duration_in_traffic.value.toDouble() / element.duration.value
+                            val category = if (ratio <= 1.2) "LCW" else "HCW"
+                            val distance =
+                                element.distance.text
+                            results.add("$time: $category")
+                            distances.add(distance)
                         }
                     }
+                    if (results.size == times.size) {
+                        displayResults(results, distances)
+                    }
                 }
-            }
 
-            override fun onFailure(call: Call<TrafficModels.DistanceMatrixResponse>, t: Throwable) {
-                // Handle failure
-            }
-        })
+                override fun onFailure(
+                    call: Call<TrafficModels.DistanceMatrixResponse>,
+                    t: Throwable
+                ) {
+                    // Handle failure
+                }
+            })
+        }
+    }
+
+    private fun displayResults(results: List<String>, distances: List<String>) {
+        val finalWorkload: String
+        val lcwCount = results.count { it.contains("LCW") }
+        val hcwCount = results.count { it.contains("HCW") }
+
+        finalWorkload = if (lcwCount >= hcwCount) {
+            "LCW"
+        } else {
+            "HCW"
+        }
+
+        val finalWorkloadColor: Int = if (finalWorkload == "LCW") {
+            Color.GREEN
+        } else {
+            Color.RED
+        }
+
+        val message = StringBuilder()
+        message.append("Origin: $startAddress\n")
+        message.append("Destination: $endAddress\n\n")
+
+        results.zip(distances).forEach { (result, distance) ->
+            message.append("$result, Distance: $distance\n")
+        }
+
+        val alertDialog = AlertDialog.Builder(context).apply {
+            setTitle("Traffic Congestion Analysis")
+            setMessage(message)
+            setPositiveButton("OK") { dialog, _ -> dialog.dismiss() }
+            setCancelable(false)
+        }.create()
+        hideProgressDialog()
+        alertDialog.show()
+
+        alertDialog.findViewById<TextView>(android.R.id.message)?.apply {
+            val finalMessage = "$text\nFinal Workload: $finalWorkload"
+            val spannableMessage = SpannableString(finalMessage)
+            val startIndex = finalMessage.lastIndexOf(finalWorkload)
+            spannableMessage.setSpan(
+                ForegroundColorSpan(finalWorkloadColor),
+                startIndex,
+                startIndex + finalWorkload.length,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+            text = spannableMessage
+        }
+    }
+
+    private fun timeToUnixTimestamp(time: String): Long {
+        val calendar = Calendar.getInstance()
+        calendar.timeZone = TimeZone.getDefault() // Set your timezone if necessary
+
+        // Set date to today
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val date = dateFormat.format(calendar.time)
+
+        // Combine date with time
+        val dateTime = "$date $time"
+
+        // Convert to Unix timestamp
+        val dateTimeFormat = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+        val dateObj = dateTimeFormat.parse(dateTime)
+
+        return dateObj?.time ?: 0L
+    }
+
+    private fun showProgressDialog() {
+        progressDialog = ProgressDialog(context)
+        progressDialog?.setMessage("Analyzing traffic, please wait...")
+        progressDialog?.setCancelable(false)
+        progressDialog?.show()
+    }
+
+    private fun hideProgressDialog() {
+        progressDialog?.dismiss()
     }
 }

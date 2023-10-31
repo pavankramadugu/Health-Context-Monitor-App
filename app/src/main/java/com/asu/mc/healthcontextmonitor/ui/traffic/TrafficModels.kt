@@ -32,7 +32,7 @@ class TrafficModels {
             @Query("destinations") destinations: String,
             @Query("units") units: String,
             @Query("mode") mode: String,
-            @Query("departure_time") departureTime: String,
+            @Query("departure_time") departureTime: Long,
             @Query("traffic_model") trafficModel: String,
             @Query("key") apiKey: String
         ): Call<DistanceMatrixResponse>
